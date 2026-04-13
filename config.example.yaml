@@ -1,0 +1,21 @@
+# Copy to config.yaml and edit paths/hyperparameters as needed.
+project:
+  seed: 42
+  output_weights: classifier.pt
+  metrics_path: artifacts/metrics.json
+
+data:
+  root: data/raw
+  classes: ["no_dr", "mild", "moderate", "severe", "proliferative"]
+  val_ratio: 0.2
+  num_workers: 2
+
+training:
+  epochs: 12
+  batch_size: 16
+  lr: 1e-4
+  patience: 5          # early stopping; 0 disables
+
+compute:
+  image_size: 224
+  amp: true            # automatic mixed precision if CUDA

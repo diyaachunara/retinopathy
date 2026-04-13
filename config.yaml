@@ -1,0 +1,23 @@
+# Copy to config.yaml and edit paths/hyperparameters as needed.
+project:
+  seed: 42
+  output_weights: classifier.pt
+  metrics_path: artifacts/metrics.json
+
+data:
+  # Point to your dataset root (one subfolder per class)
+  root: data/colored_images
+  # Match your folder names exactly and in desired order
+  classes: ["No_DR", "Mild", "Moderate", "Severe", "Proliferate_DR"]
+  val_ratio: 0.2
+  num_workers: 2
+
+training:
+  epochs: 4
+  batch_size: 16
+  lr: 0.0001
+  patience: 5          # early stopping; 0 disables
+
+compute:
+  image_size: 224
+  amp: true            # automatic mixed precision if CUDA

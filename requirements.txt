@@ -1,0 +1,12 @@
+matplotlib==3.8.4
+numpy==1.26.4
+pandas==2.2.1
+Pillow==10.3.0
+python-dateutil==2.9.0.post0
+scikit-learn==1.4.2
+scikit-image==0.23.2
+torch==2.2.2
+torchvision==0.17.2
+mysql-connector-python==9.6.0
+twilio==9.10.2
+customtkinter==5.2.2
