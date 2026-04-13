@@ -66,5 +66,6 @@ git push -u origin main
 - The app prefers GPU if available; otherwise CPU is used automatically.
 - Make sure `bg.png` / `bgs.png` exists if you want the background art shown in the UI.
 
-##Datasets
+## Datasets
+
 https://www.kaggle.com/datasets/sovitrath/diabetic-retinopathy-224x224-2019-data
