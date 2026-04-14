@@ -319,10 +319,12 @@ class App(ctk.CTk):
             label, probs = predict(path, model=self.model, device=self.device, labels=DEFAULT_LABELS)
             conf = max(probs) * 100
             img = Image.open(path).convert("RGB")
+            
             # Keep preview reasonable in the dialog
             preview_size = (240, 240)
-            img.thumbnail(preview_size)
-            preview = ctk.CTkImage(img, size=img.size)
+            img_thumb = img.copy()
+            img_thumb.thumbnail(preview_size)
+            preview = ctk.CTkImage(img_thumb, size=img_thumb.size)
 
             # Show stylish result
             result_window = ctk.CTkToplevel(self)
@@ -340,7 +342,7 @@ class App(ctk.CTk):
             ctk.CTkButton(
                 result_window,
                 text="Show plot scan image",
-                command=lambda: self._open_scan_tab(preview, label, conf),
+                command=lambda: self._open_scan_tab(preview, label, conf, img.copy()),
                 width=180,
             ).pack(pady=(6, 4))
             ctk.CTkButton(result_window, text="OK", command=result_window.destroy, width=100).pack(pady=6)
@@ -348,27 +350,86 @@ class App(ctk.CTk):
         except Exception as exc:
             messagebox.showerror("Error", str(exc))
 
-    def _open_scan_tab(self, preview_img: ctk.CTkImage, label: str, conf: float):
+    def _open_scan_tab(self, preview_img: ctk.CTkImage, label: str, conf: float, original_img: Image.Image = None):
         """
         Open a new tabbed window dedicated to the scanned image and its prediction.
         """
         scan_window = ctk.CTkToplevel(self)
         scan_window.title("Scan View")
-        scan_window.geometry("420x420")
+        scan_window.geometry("820x620")
         scan_window.resizable(False, False)
         scan_window.attributes("-topmost", True)
         scan_window.preview_img = preview_img  # keep reference alive
 
-        tabview = ctk.CTkTabview(scan_window, width=380, height=340, corner_radius=12)
-        tabview.pack(pady=12, padx=12)
-        tab_image = tabview.add("Scan Image")
-
-        ctk.CTkLabel(tab_image, text=f"Prediction: {label}", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(12, 4))
-        ctk.CTkLabel(tab_image, text=f"Confidence: {conf:.1f}%", font=ctk.CTkFont(size=14)).pack(pady=(0, 10))
-        ctk.CTkLabel(tab_image, text="Uploaded scan", font=ctk.CTkFont(size=12)).pack()
-        ctk.CTkLabel(tab_image, image=preview_img, text="").pack(pady=6)
+        if original_img is not None:
+            try:
+                plot_pil = self._generate_plot(original_img)
+                # Ensure the plot fits exactly within the view space
+                plot_pil.thumbnail((780, 520))
+                plot_ctk = ctk.CTkImage(plot_pil, size=plot_pil.size)
+                scan_window.plot_ctk = plot_ctk  # keep ref
+                ctk.CTkLabel(scan_window, image=plot_ctk, text="").pack(pady=20)
+            except Exception as e:
+                ctk.CTkLabel(scan_window, text=f"Could not generate plot: {e}").pack(pady=40)
+        else:
+            ctk.CTkLabel(scan_window, text="Original image not available.").pack(pady=40)
 
         ctk.CTkButton(scan_window, text="Close", command=scan_window.destroy, width=100).pack(pady=6)
+
+    def _generate_plot(self, original_img_pil):
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        import numpy as np
+        import io
+
+        # Crop and pad logic
+        img_np = np.array(original_img_pil)
+        if img_np.ndim == 3:
+            gray = np.dot(img_np[..., :3], [0.2989, 0.5870, 0.1140])
+        elif img_np.ndim == 2:
+            gray = img_np
+        else:
+            gray = img_np
+
+        mask = gray > 7
+        if mask.any():
+            coords = np.column_stack(np.where(mask))
+            top_left = coords.min(axis=0)
+            bottom_right = coords.max(axis=0)
+            cropped_np = img_np[top_left[0]:bottom_right[0]+1, top_left[1]:bottom_right[1]+1]
+            
+            # pad to square
+            h, w = cropped_np.shape[:2]
+            size = max(h, w)
+            pad_h = (size - h) // 2
+            pad_w = (size - w) // 2
+            if cropped_np.ndim == 3:
+                padded = np.pad(cropped_np, ((pad_h, size - h - pad_h), (pad_w, size - w - pad_w), (0, 0)), mode='constant')
+            else:
+                padded = np.pad(cropped_np, ((pad_h, size - h - pad_h), (pad_w, size - w - pad_w)), mode='constant')
+            cropped_pil = Image.fromarray(padded)
+        else:
+            cropped_pil = original_img_pil.copy()
+            
+        resample_filter = getattr(Image, 'Resampling', Image).LANCZOS
+        cropped_pil_512 = cropped_pil.resize((512, 512), resample_filter)
+
+        fig = Figure(figsize=(6, 6), dpi=100)
+        
+        ax = fig.add_subplot(1, 1, 1)
+        ax.imshow(cropped_pil_512)
+        ax.set_title('Cropped and Padded Image')
+        
+        fig.suptitle('Image Processing')
+        fig.tight_layout()
+        
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png')
+        buf.seek(0)
+        return Image.open(buf)
 
 def main():
     app = App()
